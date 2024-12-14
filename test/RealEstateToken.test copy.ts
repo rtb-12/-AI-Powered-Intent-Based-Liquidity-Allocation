@@ -21,7 +21,8 @@ describe("RealEstateToken Contract", function () {
     expect(await realEstateToken.owner()).to.equal(owner.address);
   });
 
-  it("Should mint a new token and track it", async () => {
+  it("Should mint a new token", async () => {
+    const tokenId = 0;
     const amount = 100;
     const uri = "https://example.com/token/0";
 
@@ -32,61 +33,26 @@ describe("RealEstateToken Contract", function () {
     );
     await mintTx.wait();
 
-    const tokenId = 0; // First minted token has ID 0
-
     expect(
       await realEstateToken.balanceOf(otherAccount.address, tokenId)
     ).to.equal(amount);
     expect(await realEstateToken.uri(tokenId)).to.equal(uri);
-
-    const mintedTokens = await realEstateToken.getMintedTokensByAddress(
-      otherAccount.address
-    );
-
-    expect(mintedTokens.length).to.equal(1);
-    expect(mintedTokens[0].tokenId).to.equal(tokenId);
-    expect(mintedTokens[0].amount).to.equal(amount);
-    expect(mintedTokens[0].uri).to.equal(uri);
   });
 
-  it("Should retrieve all minted tokens", async () => {
-    const mintData = [
-      {
-        amount: 50,
-        uri: "https://example.com/token/1",
-        recipient: owner.address,
-      },
-      {
-        amount: 75,
-        uri: "https://example.com/token/2",
-        recipient: otherAccount.address,
-      },
-    ];
+  it("Should update the URI of an existing token", async () => {
+    const tokenId = 0;
+    const newUri = "https://example.com/token/0-updated";
 
-    for (const data of mintData) {
-      const mintTx = await realEstateToken.mintToken(
-        data.amount,
-        data.uri,
-        data.recipient
-      );
-      await mintTx.wait();
-    }
+    const updateTx = await realEstateToken.updateTokenURI(tokenId, newUri);
+    await updateTx.wait();
 
-    const allMintedTokens = await realEstateToken.getAllMintedTokens();
-    expect(allMintedTokens.length).to.equal(2);
-
-    for (let i = 0; i < mintData.length; i++) {
-      expect(allMintedTokens[i].tokenId).to.equal(i);
-      expect(allMintedTokens[i].amount).to.equal(mintData[i].amount);
-      expect(allMintedTokens[i].uri).to.equal(mintData[i].uri);
-      expect(allMintedTokens[i].creator).to.equal(owner.address);
-    }
+    expect(await realEstateToken.uri(tokenId)).to.equal(newUri);
   });
 
-  it("Should burn tokens and update balances", async () => {
+  it("Should burn tokens", async () => {
     const tokenId = 0;
     const initialAmount = 100;
-    const burnAmount = 40;
+    const burnAmount = 100;
 
     const mintTx = await realEstateToken.mintToken(
       initialAmount,
@@ -101,31 +67,11 @@ describe("RealEstateToken Contract", function () {
       otherAccount.address,
       tokenId
     );
-    expect(remainingBalance).to.equal(initialAmount - burnAmount);
-
-    const mintedTokens = await realEstateToken.getMintedTokensByAddress(
-      otherAccount.address
-    );
-    expect(mintedTokens[0].amount).to.equal(initialAmount - burnAmount);
-  });
-
-  it("Should track creator of tokens", async () => {
-    const amount = 50;
-    const uri = "https://example.com/token/1";
-
-    const mintTx = await realEstateToken.mintToken(
-      amount,
-      uri,
-      otherAccount.address
-    );
-    await mintTx.wait();
-
-    const tokenId = 0; // First minted token has ID 0
-    const creator = await realEstateToken.getTokenCreator(tokenId);
-    expect(creator).to.equal(owner.address);
+    expect(remainingBalance).to.equal(0);
   });
 
   it("Should revert minting by non-owner", async () => {
+    const tokenId = 1;
     const amount = 50;
     const uri = "https://example.com/token/1";
 

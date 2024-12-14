@@ -6,15 +6,7 @@ import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract RealEstateToken is ERC1155, Ownable {
-    struct TokenInfo {
-        uint256 tokenId;
-        uint256 amount;
-        string tokenURI;
-    }
-
     mapping(uint256 => string) private _tokenURIs;
-    mapping(address => TokenInfo[]) private _mintedTokensByAddress;
-    mapping(uint256 => address) private _tokenCreators;
     uint256 private _currentTokenId;
 
     event TokenMinted(uint256 indexed tokenId, uint256 amount, address indexed recipient);
@@ -40,13 +32,6 @@ contract RealEstateToken is ERC1155, Ownable {
 
         _mint(recipient, tokenId, amount, "");
         _tokenURIs[tokenId] = tokenURI;
-        _tokenCreators[tokenId] = msg.sender;
-
-        _mintedTokensByAddress[recipient].push(TokenInfo({
-            tokenId: tokenId,
-            amount: amount,
-            tokenURI: tokenURI
-        }));
 
         emit TokenMinted(tokenId, amount, recipient);
         return tokenId;
@@ -59,20 +44,6 @@ contract RealEstateToken is ERC1155, Ownable {
     function burnToken(uint256 tokenId, uint256 amount) external {
         require(balanceOf(msg.sender, tokenId) >= amount, "Insufficient balance to burn");
         _burn(msg.sender, tokenId, amount);
-
-        TokenInfo[] storage tokens = _mintedTokensByAddress[msg.sender];
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokens[i].tokenId == tokenId) {
-                if (tokens[i].amount > amount) {
-                    tokens[i].amount -= amount;
-                } else {
-                    tokens[i] = tokens[tokens.length - 1];
-                    tokens.pop();
-                }
-                break;
-            }
-        }
-
         emit TokenBurned(tokenId, amount, msg.sender);
     }
 
@@ -80,26 +51,5 @@ contract RealEstateToken is ERC1155, Ownable {
         require(bytes(newURI).length > 0, "URI cannot be empty");
         _tokenURIs[tokenId] = newURI;
         emit TokenURIUpdated(tokenId, newURI);
-    }
-
-    function getMintedTokensByAddress(address user) external view returns (TokenInfo[] memory) {
-        return _mintedTokensByAddress[user];
-    }
-
-    function getTokenCreator(uint256 tokenId) external view returns (address) {
-        return _tokenCreators[tokenId];
-    }
-
-    function getAllMintedTokens() external view returns (TokenInfo[] memory) {
-        uint256 totalTokens = _currentTokenId;
-        TokenInfo[] memory allTokens = new TokenInfo[](totalTokens);
-        for (uint256 i = 0; i < totalTokens; i++) {
-            allTokens[i] = TokenInfo({
-                tokenId: i,
-                amount: balanceOf(_tokenCreators[i], i),
-                tokenURI: _tokenURIs[i]
-            });
-        }
-        return allTokens;
     }
 }
