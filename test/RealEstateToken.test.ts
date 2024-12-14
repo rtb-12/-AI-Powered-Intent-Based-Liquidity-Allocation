@@ -54,7 +54,6 @@ describe("RealEstateToken Contract", function () {
     const initialAmount = 100;
     const burnAmount = 100;
 
-    // Mint tokens
     const mintTx = await realEstateToken.mintToken(
       initialAmount,
       "https://example.com/token/0",
@@ -62,15 +61,13 @@ describe("RealEstateToken Contract", function () {
     );
     await mintTx.wait();
 
-    // Connect as the token holder to burn their tokens
     await realEstateToken.connect(otherAccount).burnToken(tokenId, burnAmount);
 
-    // Check remaining balance
     const remainingBalance = await realEstateToken.balanceOf(
       otherAccount.address,
       tokenId
     );
-    expect(remainingBalance).to.equal(0); // Ensure all tokens are burned
+    expect(remainingBalance).to.equal(0);
   });
 
   it("Should revert minting by non-owner", async () => {
@@ -101,7 +98,6 @@ describe("RealEstateToken Contract", function () {
     const tokenId = 0;
     const newUri = "https://example.com/token/0-updated";
 
-    // Mint a token first
     const mintTx = await realEstateToken.mintToken(
       100,
       "https://example.com/token/0",
@@ -109,7 +105,6 @@ describe("RealEstateToken Contract", function () {
     );
     await mintTx.wait();
 
-    // Try updating the URI as a non-owner
     await expect(
       realEstateToken.connect(otherAccount).updateTokenURI(tokenId, newUri)
     ).to.be.revertedWithCustomError(

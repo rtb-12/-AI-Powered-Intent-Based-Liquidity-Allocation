@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import useWallet from "../hooks/useWallet"; // Adjust path as needed
+import useWallet from "../hooks/useWallet";
 
 const Header = () => {
   const { account, connectWallet, disconnectWallet } = useWallet();
@@ -30,20 +30,20 @@ const Header = () => {
           Tokenization
         </Link>
         <Link
-          to="/contact"
-          className="text-lg font-bold text-red-500 hover:text-red-700"
+          to="/balance"
+          className="text-lg font-bold text-orange-500 hover:text-orange-700"
         >
-          Contact
+          My Tokens
         </Link>
       </nav>
       {account ? (
         <div className="flex items-center space-x-4">
-          <div className="bg-green-500 text-white py-2 px-4 rounded-lg">
+          <span className="text-sm font-medium">
             {account.slice(0, 6)}...{account.slice(-4)}
-          </div>
+          </span>
           <button
             onClick={disconnectWallet}
-            className="bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-700"
+            className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
           >
             Disconnect
           </button>
@@ -51,7 +51,7 @@ const Header = () => {
       ) : (
         <button
           onClick={connectWallet}
-          className="bg-black text-white py-2 px-4 rounded-lg hover:bg-gray-800"
+          className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
         >
           Connect Wallet
         </button>
