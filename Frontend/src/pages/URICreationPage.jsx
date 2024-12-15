@@ -1,150 +1,393 @@
 import React, { useState } from "react";
-import { create } from "kubo-rpc-client";
-import { FaCopy } from "react-icons/fa";
+import { create } from "ipfs-http-client";
+import { FaCopy, FaCheck, FaTimes, FaRobot, FaShieldAlt } from "react-icons/fa";
+import axios from "axios";
 
 const URICreationPage = () => {
-  const [assetName, setAssetName] = useState("");
-  const [assetDescription, setAssetDescription] = useState("");
-  const [assetImage, setAssetImage] = useState(null);
-  const [assetDocument, setAssetDocument] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    assetName: "",
+    description: "",
+    propertyAddress: "",
+    propertyPrice: "",
+    image: null,
+    documents: null,
+  });
+
+  const [status, setStatus] = useState({
+    loading: false,
+    validating: false,
+    uploading: false,
+    copied: false,
+  });
+
+  const [validation, setValidation] = useState({
+    analyzing: false,
+    analyzed: false,
+    generating: false,
+    generated: false,
+    result: null,
+    zkProof: null,
+  });
+
   const [uri, setUri] = useState("");
 
-  // Initialize Kubo RPC client
-  const ipfs = create({ url: "http://localhost:5001/api/v0" }); // URL of your IPFS node
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
-  // Function to handle file uploads to IPFS and generate the URI
-  const uploadToIPFS = async () => {
-    setLoading(true);
+  const handleFileChange = (e) => {
+    const { name, files } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: files[0],
+    }));
+  };
+
+  const ipfs = create({ url: "https://ipfs.infura.io:5001/api/v0" });
+
+  // Validate metadata using the AI backend
+  const validateMetadata = async () => {
+    setStatus((prev) => ({ ...prev, validating: true }));
+    setValidation((prev) => ({ ...prev, analyzing: true }));
+
     try {
-      const files = [];
+      // Send metadata to AI validation endpoint
+      const response = await axios.post(
+        "http://localhost:5000/validate_metadata",
+        {
+          property_name: formData.assetName,
+          description: formData.description,
+          address: formData.propertyAddress,
+          price: formData.propertyPrice,
+        }
+      );
 
-      // Prepare the files to upload to IPFS
-      if (assetImage) {
-        files.push({ path: "image.jpg", content: assetImage });
-      }
-      if (assetDocument) {
-        files.push({ path: "document.pdf", content: assetDocument });
-      }
+      setValidation((prev) => ({ ...prev, analyzing: false, analyzed: true }));
 
-      // Add files to IPFS
-      const addedFiles = [];
-      for await (const result of ipfs.addAll(files)) {
-        addedFiles.push(result);
-      }
-
-      if (addedFiles.length === 0) {
-        throw new Error("No files were added to IPFS");
+      if (!response.data.valid) {
+        throw new Error(response.data.message);
       }
 
-      // Prepare metadata JSON with the URIs of the uploaded files
-      const metadata = {
-        name: assetName,
-        description: assetDescription,
-        documentURI: addedFiles[1]
-          ? `https://ipfs.infura.io/ipfs/${addedFiles[1].cid.toString()}`
-          : "",
-        imageURI: addedFiles[0]
-          ? `https://ipfs.infura.io/ipfs/${addedFiles[0].cid.toString()}`
-          : "",
-      };
+      // Generate ZK proof
+      setValidation((prev) => ({ ...prev, generating: true }));
+      const zkResponse = await axios.post(
+        "http://localhost:5000/generate_proof",
+        {
+          metadata: response.data.validated_metadata,
+        }
+      );
 
-      // Upload the metadata to IPFS
-      const metadataResult = await ipfs.add({
-        path: "metadata.json",
-        content: JSON.stringify(metadata),
-      });
+      setValidation((prev) => ({
+        ...prev,
+        generating: false,
+        generated: true,
+        result: "Valid: Property metadata verification successful",
+        zkProof: zkResponse.data.proof,
+      }));
 
-      // Generate URI for the metadata on IPFS
-      const metadataURI = `https://ipfs.infura.io/ipfs/${metadataResult.cid.toString()}`;
-      setUri(metadataURI); // Set the URI for display
+      return true;
     } catch (error) {
-      console.error("Error uploading to IPFS:", error);
+      console.error("Validation error:", error);
+      setValidation((prev) => ({
+        ...prev,
+        analyzing: false,
+        generating: false,
+        result: `Invalid: ${error.message || "Validation failed"}`,
+        zkProof: null,
+      }));
+      return false;
     } finally {
-      setLoading(false);
+      setStatus((prev) => ({ ...prev, validating: false }));
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(uri);
-    alert("URI copied to clipboard!");
+  // Upload files and metadata to IPFS
+  const uploadToIPFS = async () => {
+    setStatus((prev) => ({ ...prev, uploading: true }));
+    try {
+      // Upload image if provided
+      let imageHash = null;
+      if (formData.image) {
+        const imageBuffer = await formData.image.arrayBuffer();
+        const imageResult = await ipfs.add(imageBuffer);
+        imageHash = imageResult.path;
+      }
+
+      // Upload documents if provided
+      let documentHash = null;
+      if (formData.documents) {
+        const documentBuffer = await formData.documents.arrayBuffer();
+        const documentResult = await ipfs.add(documentBuffer);
+        documentHash = documentResult.path;
+      }
+
+      // Create metadata object
+      const metadata = {
+        name: formData.assetName,
+        description: formData.description,
+        properties: {
+          address: formData.propertyAddress,
+          price: formData.propertyPrice,
+          image: imageHash ? `ipfs://${imageHash}` : null,
+          documents: documentHash ? `ipfs://${documentHash}` : null,
+          validationProof: validation.zkProof,
+        },
+        validation: {
+          status: validation.result,
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      // Upload metadata to IPFS
+      const metadataResult = await ipfs.add(JSON.stringify(metadata));
+      setUri(`ipfs://${metadataResult.path}`);
+
+      // Clear form after successful upload
+      setFormData({
+        assetName: "",
+        description: "",
+        propertyAddress: "",
+        propertyPrice: "",
+        image: null,
+        documents: null,
+      });
+    } catch (error) {
+      console.error("IPFS upload error:", error);
+      throw error;
+    } finally {
+      setStatus((prev) => ({ ...prev, uploading: false }));
+    }
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(uri);
+      setStatus((prev) => ({ ...prev, copied: true }));
+      setTimeout(() => {
+        setStatus((prev) => ({ ...prev, copied: false }));
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy:", error);
+    }
+  };
+
+  // Form validation
+  const isFormValid = () => {
+    return (
+      formData.assetName.trim() !== "" &&
+      formData.propertyAddress.trim() !== "" &&
+      formData.propertyPrice !== "" &&
+      formData.image !== null
+    );
   };
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
-      <h1 className="text-4xl font-bold text-center text-yellow-600">
-        RWA Tokenization: Upload Asset to IPFS
-      </h1>
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-3xl font-bold text-center text-yellow-600 mb-8">
+          RWA Tokenization
+        </h1>
 
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md mt-8 p-6">
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Asset Name
-          </label>
-          <input
-            type="text"
-            value={assetName}
-            onChange={(e) => setAssetName(e.target.value)}
-            placeholder="Enter asset name"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500"
-            required
-          />
-        </div>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          {/* Metadata Form */}
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Asset Name
+              </label>
+              <input
+                type="text"
+                name="assetName"
+                value={formData.assetName}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Asset Description
-          </label>
-          <textarea
-            value={assetDescription}
-            onChange={(e) => setAssetDescription(e.target.value)}
-            placeholder="Enter asset description"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500"
-            required
-          />
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Upload Image
-          </label>
-          <input
-            type="file"
-            onChange={(e) => setAssetImage(e.target.files[0])}
-            className="mt-1 block w-full text-gray-700"
-          />
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Property Address
+              </label>
+              <input
+                type="text"
+                name="propertyAddress"
+                value={formData.propertyAddress}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Upload Document (PDF, etc.)
-          </label>
-          <input
-            type="file"
-            onChange={(e) => setAssetDocument(e.target.files[0])}
-            className="mt-1 block w-full text-gray-700"
-          />
-        </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Property Price
+              </label>
+              <input
+                type="number"
+                name="propertyPrice"
+                value={formData.propertyPrice}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
 
-        <button
-          onClick={uploadToIPFS}
-          disabled={loading}
-          className="w-full bg-yellow-600 text-white py-2 px-4 rounded-md shadow hover:bg-yellow-700"
-        >
-          {loading ? "Uploading..." : "Upload to IPFS"}
-        </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Property Image
+              </label>
+              <input
+                type="file"
+                name="image"
+                onChange={handleFileChange}
+                accept="image/*"
+                className="w-full"
+              />
+            </div>
 
-        {uri && (
-          <div className="mt-4 p-4 bg-gray-200 rounded-lg flex items-center justify-between">
-            <div className="text-gray-700 break-all">{uri}</div>
-            <button
-              onClick={copyToClipboard}
-              className="ml-4 text-gray-700 hover:text-gray-900"
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Documents
+              </label>
+              <input
+                type="file"
+                name="documents"
+                onChange={handleFileChange}
+                accept=".pdf,.doc,.docx"
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          {/* Validation Status */}
+          {status.validating && (
+            <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+              <h3 className="font-semibold mb-3">Validation Progress</h3>
+
+              <div className="space-y-3">
+                <div className="flex items-center">
+                  <div
+                    className={`w-4 h-4 mr-2 ${
+                      validation.analyzing ? "animate-spin" : ""
+                    }`}
+                  >
+                    <FaRobot
+                      className={
+                        validation.analyzed ? "text-green-500" : "text-gray-400"
+                      }
+                    />
+                  </div>
+                  <span>AI Analysis</span>
+                </div>
+
+                <div className="flex items-center">
+                  <div
+                    className={`w-4 h-4 mr-2 ${
+                      validation.generating ? "animate-spin" : ""
+                    }`}
+                  >
+                    <FaShieldAlt
+                      className={
+                        validation.generated
+                          ? "text-green-500"
+                          : "text-gray-400"
+                      }
+                    />
+                  </div>
+                  <span>ZK Proof Generation</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Validation Result */}
+          {validation.result && (
+            <div
+              className={`mb-6 p-4 rounded-lg ${
+                validation.result.includes("Valid")
+                  ? "bg-green-50"
+                  : "bg-red-50"
+              }`}
             >
-              <FaCopy />
+              <div className="flex items-center mb-2">
+                {validation.result.includes("Valid") ? (
+                  <FaCheck className="text-green-500 mr-2" />
+                ) : (
+                  <FaTimes className="text-red-500 mr-2" />
+                )}
+                <span className="font-medium">{validation.result}</span>
+              </div>
+
+              {validation.zkProof && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">ZK Proof:</span>
+                    <code className="ml-2 bg-gray-100 px-2 py-1 rounded">
+                      {validation.zkProof}
+                    </code>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <button
+              onClick={validateMetadata}
+              disabled={!isFormValid() || status.validating}
+              className={`w-full py-2 px-4 rounded-md ${
+                !isFormValid() || status.validating
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+            >
+              {status.validating ? "Validating..." : "Validate Metadata"}
+            </button>
+
+            <button
+              onClick={uploadToIPFS}
+              disabled={!validation.generated || status.uploading}
+              className={`w-full py-2 px-4 rounded-md ${
+                !validation.generated || status.uploading
+                  ? "bg-gray-300 cursor-not-allowed"
+                  : "bg-yellow-600 hover:bg-yellow-700 text-white"
+              }`}
+            >
+              {status.uploading ? "Uploading..." : "Upload to IPFS"}
             </button>
           </div>
-        )}
+
+          {/* URI Display */}
+          {uri && (
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="break-all">{uri}</div>
+                <button
+                  onClick={copyToClipboard}
+                  className="ml-4 text-gray-600 hover:text-gray-900"
+                >
+                  {status.copied ? <FaCheck /> : <FaCopy />}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

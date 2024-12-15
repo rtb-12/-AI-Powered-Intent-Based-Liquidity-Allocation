@@ -35,6 +35,12 @@ const Header = () => {
         >
           My Tokens
         </Link>
+        <Link
+          to="/liquidity"
+          className="text-lg font-bold text-orange-500 hover:text-orange-700"
+        >
+          Liquidity Pool
+        </Link>
       </nav>
       {account ? (
         <div className="flex items-center space-x-4">

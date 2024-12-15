@@ -1,17 +1,54 @@
-node_modules
+# Dependencies
+node_modules/
+venv/
 .env
-venv
-# Hardhat files
-/cache
-/artifacts
+package-lock.json
+yarn.lock
 
-# TypeChain files
-/typechain
-/typechain-types
+# Development
+.vscode/
+.idea/
+*.log
+.DS_Store
 
-# solidity-coverage files
-/coverage
-/coverage.json
+# Hardhat
+cache/
+artifacts/
+typechain/
+typechain-types/
+coverage/
+coverage.json
+ignition/deployments/
 
-# Hardhat Ignition default folder for deployments against a local node
-ignition/deployments/chain-31337
+# Frontend
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/node_modules/
+
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/instance/
+backend/.pytest_cache/
+backend/env/
+backend/.env
+
+# IPFS
+.ipfs/
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+
+# Production
+build/
+dist/
+.env.production
+
+# Misc
+.DS_Store
+*.pem
+.vercel
+.netlify

@@ -5,6 +5,7 @@ import HomePage from "./pages/HomePage";
 import TokenizationPage from "./pages/TokenizationPage";
 import URICreationPage from "./pages/URICreationPage";
 import TokenBalancePage from "./pages/TokenBalancePage";
+import LiquidityPoolPage from "./pages/LiquidityPoolPage";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/tokenization" element={<TokenizationPage />} />
         <Route path="/uri-creation" element={<URICreationPage />} />
         <Route path="/balance" element={<TokenBalancePage />} />
+        <Route path="/liquidity" element={<LiquidityPoolPage />} />
       </Routes>
     </div>
   );
