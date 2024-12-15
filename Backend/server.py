@@ -38,6 +38,30 @@ def generate_zkp(metadata_hash, ai_output_hash, validation_result):
             return f.read()
     except subprocess.CalledProcessError as e:
         raise Exception(f"Error generating ZKP: {str(e)}")
+    
+# Simple AI logic to recommend liquidity allocations
+def get_ai_recommendations(intent):
+    if intent == "Maximize Yield":
+        # AI suggests 70% to staking, 30% to RWAs for maximizing yield
+        return {"staking": 70, "rwa": 30}
+    elif intent == "Minimize Risk":
+        # AI suggests 30% to staking, 70% to RWAs for minimizing risk
+        return {"staking": 30, "rwa": 70}
+    else:
+        # Default recommendation in case of invalid intent
+        return {"staking": 50, "rwa": 50}
+    
+@app.route('/get_allocation', methods=['POST'])
+def get_allocation():
+    user_intent = request.json.get('intent')  # e.g., "Maximize Yield"
+    
+    # Get AI recommendation
+    allocation = get_ai_recommendations(user_intent)
+    
+    # Here, you would call the smart contract to update the allocations
+    # For example, using Web3.py to call the `rebalanceLiquidity` function
+    
+    return jsonify(allocation)
 
 
 @app.route('/validate_metadata', methods=['POST'])

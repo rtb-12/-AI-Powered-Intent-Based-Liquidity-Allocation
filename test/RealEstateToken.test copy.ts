@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { RealEstateToken } from "../typechain-types";
 
 describe("RealEstateToken Contract", function () {
-  let realEstateToken: RealEstateToken;
+  let realEstateToken: RealEst  ateToken;
   let owner: any;
   let otherAccount: any;
 
