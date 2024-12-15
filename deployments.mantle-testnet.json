@@ -1,0 +1,8 @@
+{
+  "network": "mantle-testnet",
+  "MockOracle": "0x774B575Fac3A92DF6AeCbAFa5C01B75895102c13",
+  "RealEstateToken": "0xE0d05c7bAe5C4e7B5600259C5D1435F75a128878",
+  "LiquidityPool": "0xC6156C496415722d58468422833514B0bfeC5ABE",
+  "timestamp": "2024-12-15T11:40:51.960Z",
+  "deployer": "0x19759369506Dbe2eE2F007C5f3b8c015507e4E00"
+}

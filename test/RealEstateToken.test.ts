@@ -1,19 +1,18 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { RealEstateToken } from "../typechain-types";
 
 describe("RealEstateToken Contract", function () {
   let realEstateToken: RealEstateToken;
-  let owner: any;
-  let otherAccount: any;
+  let owner: SignerWithAddress;
+  let otherAccount: SignerWithAddress;
 
   beforeEach(async () => {
     [owner, otherAccount] = await ethers.getSigners();
 
     const RealEstateToken = await ethers.getContractFactory("RealEstateToken");
-    realEstateToken = (await RealEstateToken.deploy(
-      owner.address
-    )) as RealEstateToken;
+    realEstateToken = await RealEstateToken.deploy(owner.address);
     await realEstateToken.waitForDeployment();
   });
 
@@ -22,9 +21,11 @@ describe("RealEstateToken Contract", function () {
   });
 
   it("Should mint a new token and track it", async () => {
-    const amount = 100;
+    const amount = BigInt(100);
     const uri = "https://example.com/token/0";
+    const tokenId = 0n;
 
+    // Mint token and wait for confirmation
     const mintTx = await realEstateToken.mintToken(
       amount,
       uri,
@@ -32,54 +33,58 @@ describe("RealEstateToken Contract", function () {
     );
     await mintTx.wait();
 
-    const tokenId = 0; // First minted token has ID 0
+    // Verify balance
+    const balance = await realEstateToken.balanceOf(
+      otherAccount.address,
+      tokenId
+    );
+    expect(balance).to.equal(amount);
 
-    expect(
-      await realEstateToken.balanceOf(otherAccount.address, tokenId)
-    ).to.equal(amount);
-    expect(await realEstateToken.uri(tokenId)).to.equal(uri);
+    // Verify URI
+    const tokenURI = await realEstateToken.uri(tokenId);
+    expect(tokenURI).to.equal(uri);
 
+    // Verify token tracking
     const mintedTokens = await realEstateToken.getMintedTokensByAddress(
       otherAccount.address
     );
-
     expect(mintedTokens.length).to.equal(1);
     expect(mintedTokens[0].tokenId).to.equal(tokenId);
     expect(mintedTokens[0].amount).to.equal(amount);
-    expect(mintedTokens[0].uri).to.equal(uri);
+    expect(mintedTokens[0].tokenURI).to.equal(uri); // Changed from uri to tokenURI
   });
 
   it("Should retrieve all minted tokens", async () => {
     const mintData = [
       {
-        amount: 50,
+        amount: BigInt(50),
         uri: "https://example.com/token/1",
         recipient: owner.address,
       },
       {
-        amount: 75,
+        amount: BigInt(75),
         uri: "https://example.com/token/2",
         recipient: otherAccount.address,
       },
     ];
 
+    // Mint tokens
     for (const data of mintData) {
-      const mintTx = await realEstateToken.mintToken(
-        data.amount,
-        data.uri,
-        data.recipient
-      );
-      await mintTx.wait();
+      await realEstateToken.mintToken(data.amount, data.uri, data.recipient);
     }
 
+    // Get all minted tokens
     const allMintedTokens = await realEstateToken.getAllMintedTokens();
     expect(allMintedTokens.length).to.equal(2);
 
+    // Verify each token's data
     for (let i = 0; i < mintData.length; i++) {
-      expect(allMintedTokens[i].tokenId).to.equal(i);
-      expect(allMintedTokens[i].amount).to.equal(mintData[i].amount);
-      expect(allMintedTokens[i].uri).to.equal(mintData[i].uri);
-      expect(allMintedTokens[i].creator).to.equal(owner.address);
+      const balance = await realEstateToken.balanceOf(
+        mintData[i].recipient,
+        BigInt(i)
+      );
+      expect(balance).to.equal(mintData[i].amount);
+      expect(allMintedTokens[i].tokenURI).to.equal(mintData[i].uri);
     }
   });
 

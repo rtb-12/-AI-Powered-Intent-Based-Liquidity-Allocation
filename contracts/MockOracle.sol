@@ -2,9 +2,9 @@
 pragma solidity ^0.8.22;
 
 contract MockOracle {
-    address public owner; // Address of the contract owner
-    uint256 public stakingAllocation; // Simulated staking allocation (in percentage)
-    uint256 public rwaAllocation; // Simulated RWA allocation (in percentage)
+    address public owner; 
+    uint256 public stakingAllocation; 
+    uint256 public rwaAllocation;
 
     event DataUpdated(
         uint256 stakingAllocation,
@@ -18,10 +18,9 @@ contract MockOracle {
     }
 
     constructor() {
-        owner = msg.sender; // Set the deployer as the owner
+        owner = msg.sender; 
     }
 
-    // Function to update the data (simulating external input)
     function updateData(uint256 _stakingAllocation, uint256 _rwaAllocation)
         external
         onlyOwner
@@ -37,7 +36,6 @@ contract MockOracle {
         emit DataUpdated(_stakingAllocation, _rwaAllocation, msg.sender);
     }
 
-    // Function to get the current data (simulates fetching external data)
     function getData() external view returns (uint256, uint256) {
         return (stakingAllocation, rwaAllocation);
     }
